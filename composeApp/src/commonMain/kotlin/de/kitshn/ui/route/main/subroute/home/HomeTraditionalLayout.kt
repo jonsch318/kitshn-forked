@@ -129,7 +129,7 @@ fun HomeTraditionalLayout(
         if(p.vm.tandoorClient == null) return@LaunchedEffect
         delay(100)
 
-        if(resultIds.size > 0) {
+        if(resultIds.isNotEmpty()) {
             pageLoadingState = ErrorLoadingSuccessState.SUCCESS
             return@LaunchedEffect
         }
@@ -351,6 +351,7 @@ fun HomeTraditionalLayout(
                                         onClickKeyword = {
                                             coroutineScope.launch {
                                                 homeSearchState.openWithKeyword(
+                                                    p.vm.keywordRepo,
                                                     p.vm.tandoorClient!!,
                                                     it
                                                 )

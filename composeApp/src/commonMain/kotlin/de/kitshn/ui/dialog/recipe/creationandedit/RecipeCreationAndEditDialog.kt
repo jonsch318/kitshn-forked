@@ -48,6 +48,7 @@ import de.kitshn.formEqualsInt
 import de.kitshn.handlePagerState
 import de.kitshn.handleTandoorRequestState
 import de.kitshn.model.form.KitshnForm
+import de.kitshn.repo.KeywordRepository
 import de.kitshn.ui.TandoorRequestErrorHandler
 import de.kitshn.ui.component.icons.IconWithState
 import de.kitshn.ui.component.model.SectionStepIndicator
@@ -208,6 +209,7 @@ class RecipeCreationAndEditDialogValue(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun RecipeCreationAndEditDialog(
+    keywordRepo: KeywordRepository,
     client: TandoorClient,
     creationState: RecipeCreationDialogState? = null,
     editState: RecipeEditDialogState? = null,
@@ -259,7 +261,7 @@ fun RecipeCreationAndEditDialog(
                 showFractionalValues = showFractionalValues
             )
         },
-        { KeywordsPage(client = client, values = values) }
+        { KeywordsPage(keywordRepo = keywordRepo, client = client, values = values) }
     )
 
     // create (temporary) recipe for creation dialog

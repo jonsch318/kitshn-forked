@@ -2,9 +2,9 @@ package de.kitshn.db
 
 import androidx.room.Dao
 import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -12,8 +12,8 @@ interface ShoppingDao {
     @Query("SELECT * FROM ShoppingItemEntity ORDER BY `order` ASC")
     fun getAllAsFlow(): Flow<List<ShoppingItemEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(items: List<ShoppingItemEntity>)
+    @Upsert
+    suspend fun upsert(items: List<ShoppingItemEntity>)
 
     @Query("DELETE FROM ShoppingItemEntity")
     suspend fun deleteAll()
@@ -21,7 +21,7 @@ interface ShoppingDao {
     @Transaction
     suspend fun syncRemoteItems(items: List<ShoppingItemEntity>) {
         deleteAll()
-        insertAll(items)
+        upsert(items)
     }
 
     @Query("UPDATE ShoppingItemEntity SET checked = :checked WHERE id = :id")

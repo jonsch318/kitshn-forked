@@ -31,6 +31,7 @@ import de.kitshn.foodToIdList
 import de.kitshn.handleTandoorRequestState
 import de.kitshn.keywordToIdList
 import de.kitshn.reachedBottom
+import de.kitshn.repo.KeywordRepository
 import de.kitshn.ui.TandoorRequestErrorHandler
 import de.kitshn.ui.component.alert.FullSizeAlertPane
 import de.kitshn.ui.component.loading.AnimatedContainedLoadingIndicator
@@ -50,6 +51,7 @@ const val HOME_SEARCH_PAGING_SIZE = 36
 @Composable
 fun ViewHomeSearchContent(
     client: TandoorClient,
+    keywordRepo: KeywordRepository,
     state: HomeSearchState,
     selectionModeState: SelectionModeState<Int>? = null,
     onClick: (recipe: TandoorRecipeOverview) -> Unit
@@ -179,6 +181,7 @@ fun ViewHomeSearchContent(
         Modifier.fillMaxSize()
     ) {
         AdditionalSearchSettingsChipRow(
+            keywordRepo = keywordRepo,
             client = client,
             state = additionalSearchSettingsChipRowState
         )

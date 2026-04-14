@@ -173,6 +173,7 @@ fun HomeSearchTopBar(
         Box {
             ViewHomeSearchContent(
                 client = client,
+                keywordRepo = vm.keywordRepo,
                 state = state,
                 selectionModeState = selectionModeState,
                 onClick = {

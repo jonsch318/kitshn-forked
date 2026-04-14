@@ -53,6 +53,7 @@ import de.kitshn.api.tandoor.rememberTandoorRequestState
 import de.kitshn.handleTandoorRequestState
 import de.kitshn.reachedBottom
 import de.kitshn.removeIf
+import de.kitshn.repo.KeywordRepository
 import de.kitshn.ui.TandoorRequestErrorHandler
 import de.kitshn.ui.component.alert.FullSizeAlertPane
 import de.kitshn.ui.component.input.AlwaysDockedSearchBar
@@ -71,6 +72,8 @@ import kitshn.composeapp.generated.resources.search_tags_filter_empty
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
+
+const val KEYWORD_PAGE_SIZE = HOME_SEARCH_PAGING_SIZE
 
 @Composable
 fun rememberSelectMultipleKeywordsDialogState(): SelectMultipleKeywordsDialogState {
@@ -98,6 +101,7 @@ class SelectMultipleKeywordsDialogState(
 
 @Composable
 fun SelectMultipleKeywordsDialog(
+    keywordRepo: KeywordRepository,
     client: TandoorClient,
     state: SelectMultipleKeywordsDialogState,
     prepend: @Composable () -> Unit = {},
@@ -143,6 +147,7 @@ fun SelectMultipleKeywordsDialog(
                                     modifier = Modifier
                                         .fillMaxHeight()
                                         .fillMaxWidth(),
+                                    keywordRepo = keywordRepo,
                                     client = client,
                                     hideKeywordCreation = hideKeywordCreation,
                                     selectedKeywords = state.selectedKeywords
@@ -159,7 +164,7 @@ fun SelectMultipleKeywordsDialog(
                         Box(
                             Modifier.fillMaxHeight()
                         ) {
-                            if(state.selectedKeywords.size == 0) {
+                            if(state.selectedKeywords.isEmpty()) {
                                 FullSizeAlertPane(
                                     imageVector = Icons.Rounded.Search,
                                     contentDescription = stringResource(Res.string.search_tags_filter_empty),
@@ -238,8 +243,9 @@ fun KeywordCheckedListItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KeywordSearchBar(
-    modifier: Modifier = Modifier,
     client: TandoorClient,
+    keywordRepo: KeywordRepository,
+    modifier: Modifier = Modifier,
     selectedKeywords: List<TandoorKeyword>,
     hideKeywordCreation: Boolean = false,
     onCheckedChange: (keyword: TandoorKeyword, keywordId: Int, value: Boolean) -> Unit
@@ -256,10 +262,8 @@ fun KeywordSearchBar(
         search = query
     }
 
-    val selectedKeywordIds = remember { mutableStateListOf<Int>() }
-    LaunchedEffect(selectedKeywords.toList()) {
-        selectedKeywordIds.clear()
-        selectedKeywordIds.addAll(selectedKeywords.map { it.id })
+    val selectedKeywordIds by remember(selectedKeywords) {
+        derivedStateOf { selectedKeywords.map { it.id }.toSet() }
     }
 
     val searchRequestState = rememberTandoorRequestState()
@@ -269,59 +273,20 @@ fun KeywordSearchBar(
     var nextPageExists by rememberSaveable { mutableStateOf(false) }
 
     val searchResults = remember { mutableStateListOf<TandoorKeyword>() }
+    var isLoading by remember { mutableStateOf(false) }
+
     LaunchedEffect(search) {
-        currentPage = 1
-
-        searchRequestState.wrapRequest {
-            client.keyword.list(
-                query = search,
-                pageSize = HOME_SEARCH_PAGING_SIZE,
-            )
-        }?.let {
-            currentPage++
-
-            nextPageExists = it.next != null
-
+        isLoading = true
+        try {
+            val results = if (search.isBlank()) {
+                keywordRepo.getAll(limit = KEYWORD_PAGE_SIZE)
+            } else {
+                keywordRepo.search(search, limit = KEYWORD_PAGE_SIZE)
+            }
             searchResults.clear()
-            searchResults.addAll(it.results)
-        }
-    }
-
-    val searchLazyListState = rememberLazyListState()
-    val reachedBottom by remember { derivedStateOf { searchLazyListState.reachedBottom(buffer = 3) } }
-
-    var fetchNewItems by remember { mutableStateOf(false) }
-    LaunchedEffect(reachedBottom) {
-        if(reachedBottom) {
-            fetchNewItems = true
-        }
-    }
-
-    LaunchedEffect(fetchNewItems, nextPageExists) {
-        while(fetchNewItems && nextPageExists) {
-            if(searchRequestState.state != TandoorRequestStateState.SUCCESS) {
-                delay(500)
-                continue
-            }
-
-            extendedSearchRequestState.wrapRequest {
-                client.keyword.list(
-                    query = search,
-                    pageSize = HOME_SEARCH_PAGING_SIZE,
-                    page = currentPage
-                )
-            }?.let {
-                currentPage++
-
-                nextPageExists = it.next != null
-                searchResults.addAll(it.results)
-
-                if(!reachedBottom) fetchNewItems = false
-            }
-
-            hapticFeedback.handleTandoorRequestState(extendedSearchRequestState)
-
-            delay(500)
+            searchResults.addAll(results)
+        } finally {
+            isLoading = false
         }
     }
 
@@ -340,15 +305,9 @@ fun KeywordSearchBar(
     val createKeywordRequestState = rememberTandoorRequestState()
     fun createKeyword(name: String) = coroutineScope.launch {
         createKeywordRequestState.wrapRequest {
-            try {
-                query = ""
-
-                client.keyword.create(name, name).let {
-                    onCheckedChange(it, it.id, true)
-                }
-            } catch(e: Exception) {
-                Logger.e("SelectMultipleKeywordsDialog.kt", e)
-            }
+            val keyword = keywordRepo.ensureCreated(client, name, name)
+            query = ""
+            onCheckedChange(keyword, keyword.id, true)
         }
     }
 
@@ -367,10 +326,7 @@ fun KeywordSearchBar(
                     search = it
                 },
                 leadingIcon = {
-                    Icon(
-                        Icons.Rounded.Search,
-                        stringResource(Res.string.search_tags)
-                    )
+                    Icon(Icons.Rounded.Search, stringResource(Res.string.search_tags))
                 },
                 placeholder = { Text(stringResource(Res.string.search_tags)) },
                 expanded = true,
@@ -378,19 +334,13 @@ fun KeywordSearchBar(
             )
         }
     ) {
-        LazyColumn(
-            state = searchLazyListState,
-        ) {
+        LazyColumn {
             if(showKeywordCreationItem && !hideKeywordCreation) {
                 item {
                     ListItem(
-                        modifier = Modifier.clickable {
-                            createKeyword(query)
-                        },
+                        modifier = Modifier.clickable { createKeyword(query) },
                         leadingContent = {
-                            IconButton(onClick = {
-                                createKeyword(query)
-                            }) {
+                            IconButton(onClick = { createKeyword(query) }) {
                                 Icon(Icons.Rounded.Add, stringResource(Res.string.action_add))
                             }
                         },
@@ -403,7 +353,6 @@ fun KeywordSearchBar(
 
             items(searchResults.size, key = { searchResults[it].id }) {
                 val keyword = searchResults[it]
-
                 KeywordCheckedListItem(
                     checked = selectedKeywordIds.contains(keyword.id),
                     keyword = keyword
@@ -414,11 +363,10 @@ fun KeywordSearchBar(
             }
 
             LazyListAnimatedContainedLoadingIndicator(
-                nextPageExists = nextPageExists,
+                nextPageExists = true,
                 extendedRequestState = extendedSearchRequestState
             )
         }
     }
 
-    TandoorRequestErrorHandler(state = createKeywordRequestState)
-}
+    TandoorRequestErrorHandler(state = createKeywordRequestState)}

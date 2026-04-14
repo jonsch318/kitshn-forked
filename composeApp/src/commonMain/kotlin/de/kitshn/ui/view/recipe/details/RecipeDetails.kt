@@ -1050,6 +1050,7 @@ fun ViewRecipeDetails(
 
     if(p.vm.tandoorClient != null) {
         RecipeCreationAndEditDialog(
+            keywordRepo = p.vm.keywordRepo,
             client = p.vm.tandoorClient!!,
             showFractionalValues = ingredientsShowFractionalValues.value,
             editState = recipeEditDialogState,

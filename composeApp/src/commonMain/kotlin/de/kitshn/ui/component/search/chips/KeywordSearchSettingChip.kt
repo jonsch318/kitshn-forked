@@ -6,6 +6,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import de.kitshn.api.tandoor.TandoorClient
+import de.kitshn.repo.KeywordRepository
 import de.kitshn.ui.component.search.AdditionalSearchSettingsChipRowState
 import de.kitshn.ui.component.settings.SettingsSwitchListItem
 import de.kitshn.ui.dialog.select.SelectMultipleKeywordsDialog
@@ -18,13 +19,15 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun KeywordSearchSettingChip(
+    keywordRepo: KeywordRepository,
     client: TandoorClient,
     state: AdditionalSearchSettingsChipRowState
 ) {
-    val selected = state.selectedKeywords.size > 0
+    val selected = state.selectedKeywords.isNotEmpty()
 
     val dialogState = rememberSelectMultipleKeywordsDialogState()
     SelectMultipleKeywordsDialog(
+        keywordRepo = keywordRepo,
         client = client,
         prepend = {
             SettingsSwitchListItem(

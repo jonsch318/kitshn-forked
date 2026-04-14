@@ -14,6 +14,7 @@ import de.kitshn.api.tandoor.model.TandoorKeyword
 import de.kitshn.api.tandoor.model.TandoorKeywordOverview
 import de.kitshn.api.tandoor.route.TandoorRecipeQueryParametersSortOrder
 import de.kitshn.api.tandoor.route.TandoorUser
+import de.kitshn.repo.KeywordRepository
 import de.kitshn.ui.component.search.AdditionalSearchSettingsChipRowState
 import de.kitshn.ui.state.foreverRememberNotSavable
 import kotlinx.coroutines.delay
@@ -73,14 +74,14 @@ class HomeSearchState(
         this.shown.value = true
     }
 
-    suspend fun openWithKeyword(client: TandoorClient, keywordOverview: TandoorKeywordOverview) {
-        return openWithKeywordId(client, keywordOverview.id)
+    suspend fun openWithKeyword(keywordRepo: KeywordRepository, client: TandoorClient, keywordOverview: TandoorKeywordOverview) {
+        return openWithKeywordId(keywordRepo, client, keywordOverview.id)
     }
 
-    suspend fun openWithKeywordId(client: TandoorClient, keywordId: Int) {
+    suspend fun openWithKeywordId(keywordRepo: KeywordRepository, client: TandoorClient, keywordId: Int) {
         TandoorRequestState().wrapRequest {
-            val keyword = client.container.keyword[keywordId]
-                ?: client.keyword.retrieve(keywordId)
+            // The Repo handles the DB check and the API call internally
+            val keyword = keywordRepo.getOrFetch(client, keywordId)
 
             open(
                 HomeSearchStateDefaultValues(

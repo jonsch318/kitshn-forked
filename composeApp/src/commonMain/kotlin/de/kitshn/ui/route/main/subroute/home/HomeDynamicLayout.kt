@@ -28,7 +28,6 @@ import de.kitshn.android.homepage.builder.HomePageBuilder
 import de.kitshn.api.tandoor.TandoorRequestState
 import de.kitshn.api.tandoor.TandoorRequestStateState
 import de.kitshn.cache.FoodNameIdMapCache
-import de.kitshn.cache.KeywordNameIdMapCache
 import de.kitshn.homepage.builder.HomePageSectionEnum
 import de.kitshn.homepage.model.HomePage
 import de.kitshn.homepage.model.HomePageSection
@@ -88,19 +87,17 @@ fun HomeDynamicLayout(
         if(p.vm.tandoorClient == null) return@LaunchedEffect
         if(homePage != null) return@LaunchedEffect
 
-        val keywordNameIdMapCache = KeywordNameIdMapCache(context, p.vm.tandoorClient!!)
         val foodNameIdMapCache = FoodNameIdMapCache(context, p.vm.tandoorClient!!)
 
         // retrieve keywords and foods to map names to ids
         TandoorRequestState().wrapRequest {
-            if(!keywordNameIdMapCache.isValid()) keywordNameIdMapCache.update(coroutineScope)
             if(!foodNameIdMapCache.isValid()) foodNameIdMapCache.update(coroutineScope)
         }
 
         if(p.vm.isTest) {
             TandoorRequestState().wrapRequest {
                 val section = HomePageSectionEnum.NEW.toHomePageSection(
-                    keywordNameIdMapCache = keywordNameIdMapCache,
+                    p.vm.keywordRepo,
                     foodNameIdMapCache = foodNameIdMapCache
                 )
 
@@ -115,11 +112,11 @@ fun HomeDynamicLayout(
                 }
             }
         } else {
-            HomePageBuilder(p.vm.tandoorClient!!).apply {
+            HomePageBuilder(p.vm.keywordRepo, p.vm.tandoorClient!!).apply {
                 val requestState = TandoorRequestState()
                 requestState.wrapRequest {
                     homePage = this.homePage
-                    build(keywordNameIdMapCache, foodNameIdMapCache)
+                    build(foodNameIdMapCache)
 
                     pageLoadingState = ErrorLoadingSuccessState.SUCCESS
                 }
@@ -195,14 +192,14 @@ fun HomeDynamicLayout(
                         }
                     }
 
-                    if(homePageSectionList.size == 0 && pageLoadingState != ErrorLoadingSuccessState.SUCCESS) {
+                    if(homePageSectionList.isEmpty() && pageLoadingState != ErrorLoadingSuccessState.SUCCESS) {
                         repeat(5) {
                             HomePageSectionView(
                                 client = p.vm.tandoorClient,
                                 loadingState = pageLoadingState,
                                 onClickKeyword = {
                                     coroutineScope.launch {
-                                        homeSearchState.openWithKeyword(p.vm.tandoorClient!!, it)
+                                        homeSearchState.openWithKeyword(p.vm.keywordRepo, p.vm.tandoorClient!!, it)
                                     }
                                 }
                             ) { }
@@ -215,7 +212,7 @@ fun HomeDynamicLayout(
                             selectionState = selectionModeState,
                             onClickKeyword = {
                                 coroutineScope.launch {
-                                    homeSearchState.openWithKeyword(p.vm.tandoorClient!!, it)
+                                    homeSearchState.openWithKeyword(p.vm.keywordRepo, p.vm.tandoorClient!!, it)
                                 }
                             }
                         ) {

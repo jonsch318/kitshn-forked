@@ -91,7 +91,7 @@ fun RouteMainSubrouteHome(
 
     // handle keyword passing
     p.vm.uiState.searchKeyword.WatchAndConsume {
-        homeSearchState.openWithKeywordId(p.vm.tandoorClient!!, it)
+        homeSearchState.openWithKeywordId(p.vm.keywordRepo, p.vm.tandoorClient!!, it)
     }
 
     // handle createdBy passing
@@ -248,7 +248,7 @@ fun RouteMainSubrouteHome(
                     delay(500)
 
                     homeSearchState.reopen {
-                        homeSearchState.openWithKeyword(p.vm.tandoorClient!!, it)
+                        homeSearchState.openWithKeyword(p.vm.keywordRepo, p.vm.tandoorClient!!, it)
                     }
                 }
             }
@@ -332,6 +332,7 @@ fun RouteMainSubrouteHome(
             p.vm.settings.getIngredientsShowFractionalValues.collectAsState(initial = true)
 
         RecipeCreationAndEditDialog(
+            keywordRepo = p.vm.keywordRepo,
             client = p.vm.tandoorClient!!,
             creationState = recipeCreationDialogState,
             editState = recipeEditDialogState,

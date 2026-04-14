@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import de.kitshn.api.tandoor.TandoorClient
 import de.kitshn.removeIf
+import de.kitshn.repo.KeywordRepository
 import de.kitshn.ui.component.alert.FullSizeAlertPane
 import de.kitshn.ui.dialog.select.KeywordCheckedListItem
 import de.kitshn.ui.dialog.select.KeywordSearchBar
@@ -29,6 +30,7 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun KeywordsPage(
+    keywordRepo: KeywordRepository,
     client: TandoorClient,
     values: RecipeCreationAndEditDialogValue
 ) {
@@ -64,6 +66,7 @@ fun KeywordsPage(
                                 .fillMaxWidth()
                                 .fillMaxHeight(),
                             client = client,
+                            keywordRepo = keywordRepo,
                             selectedKeywords = values.keywords
                         ) { keyword, keywordId, value ->
                             if(value) {

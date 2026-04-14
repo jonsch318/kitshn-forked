@@ -22,6 +22,7 @@ import de.kitshn.api.tandoor.model.TandoorFood
 import de.kitshn.api.tandoor.model.TandoorKeyword
 import de.kitshn.api.tandoor.route.TandoorRecipeQueryParametersSortOrder
 import de.kitshn.api.tandoor.route.TandoorUser
+import de.kitshn.repo.KeywordRepository
 import de.kitshn.ui.component.search.chips.FoodSearchSettingChip
 import de.kitshn.ui.component.search.chips.KeywordSearchSettingChip
 import de.kitshn.ui.component.search.chips.MinimumRatingSearchSettingChip
@@ -71,6 +72,7 @@ class AdditionalSearchSettingsChipRowState {
 
 @Composable
 fun AdditionalSearchSettingsChipRow(
+    keywordRepo: KeywordRepository,
     client: TandoorClient,
     state: AdditionalSearchSettingsChipRowState
 ) {
@@ -89,7 +91,7 @@ fun AdditionalSearchSettingsChipRow(
         Spacer(Modifier.width(8.dp))
 
         MinimumRatingSearchSettingChip(state = state)
-        KeywordSearchSettingChip(client = client, state = state)
+        KeywordSearchSettingChip(keywordRepo = keywordRepo, client = client, state = state)
         FoodSearchSettingChip(client = client, state = state)
         NewSearchSettingChip(state = state)
         RandomSearchSettingChip(state = state)
