@@ -16,6 +16,8 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.buildConfig)
     alias(libs.plugins.aboutlibraries)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.androidx.room)
 }
 
 val prop =
@@ -130,6 +132,9 @@ kotlin {
             implementation(libs.reorderable)
 
             implementation(libs.uri.kmp)
+
+            implementation(libs.androidx.room.runtime)
+            implementation(libs.androidx.sqlite.bundled)
         }
 
         androidMain {
@@ -284,6 +289,10 @@ aboutLibraries {
 dependencies {
     implementation(libs.androidx.ui.android)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+    add("kspAndroid", libs.androidx.room.compiler)
+    add("kspIosSimulatorArm64", libs.androidx.room.compiler)
+    add("kspIosX64", libs.androidx.room.compiler)
+    add("kspIosArm64", libs.androidx.room.compiler)
 }
 
 compose.desktop {
@@ -360,6 +369,10 @@ buildConfig {
     )
 
     buildConfigField("TEST_DEMO_URL", prop.getProperty("test.demo.url"))
+}
+
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 // fix for F-Droid

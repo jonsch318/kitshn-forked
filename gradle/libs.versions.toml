@@ -42,6 +42,9 @@ richeditor = "1.0.0-rc13"
 screengrab = "2.1.1"
 uiAndroid = "1.10.4"
 uriKmp = "0.0.21"
+room = "2.8.4"
+sqlite = "2.6.2"
+ksp = "2.3.6"
 
 [libraries]
 aboutlibraries-compose-m3 = { module = "com.mikepenz:aboutlibraries-compose-m3", version.ref = "aboutlibraries" }
@@ -111,6 +114,10 @@ runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "com
 screengrab = { module = "tools.fastlane:screengrab", version.ref = "screengrab" }
 ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose" }
 uri-kmp = { module = "com.eygraber:uri-kmp", version.ref = "uriKmp" }
+androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
 
 [plugins]
 multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -120,3 +127,5 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 buildConfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildConfig" }
 aboutlibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "aboutlibraries" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+androidx-room = { id = "androidx.room", version.ref = "room" }

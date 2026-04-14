@@ -52,8 +52,11 @@ internal fun App(
      */
     onLaunched: () -> Unit = { }
 ) {
+    val context = LocalPlatformContext.current
+
     val vm = remember {
         KitshnViewModel(
+            context = context,
             defaultTandoorClient = SavedTandoorClient.value,
             onBeforeCredentialsCheck = onBeforeCredentialsCheck,
             onLaunched = onLaunched

@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import co.touchlab.kermit.Logger
+import coil3.PlatformContext
 import de.kitshn.api.tandoor.TandoorClient
 import de.kitshn.api.tandoor.TandoorCredentials
 import de.kitshn.api.tandoor.TandoorRequestsError
@@ -22,14 +23,20 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
+import okio.FileSystem
+import okio.Path.Companion.toPath
+import okio.SYSTEM
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class KitshnViewModel(
+    context: PlatformContext,
     defaultTandoorClient: TandoorClient? = null,
 
     /**
@@ -42,6 +49,9 @@ class KitshnViewModel(
      */
     val onLaunched: () -> Unit = { }
 ) : ViewModel() {
+
+    private val dbFilePath = getDatabasePath(context)
+    val db = getRoomDatabase(getDatabaseBuilder(context))
 
     var isTest: Boolean = false
 
@@ -82,20 +92,20 @@ class KitshnViewModel(
     private var initComplete = false
 
     fun init() {
-        if(initComplete) return
+        if (initComplete) return
         initComplete = true
 
         initTime = Clock.System.now()
             .toEpochMilliseconds()
 
         viewModelScope.launch {
-            if(settings.getFirstRunTime.first() == -1L)
+            if (settings.getFirstRunTime.first() == -1L)
                 settings.setFirstRunTime()
 
             val credentials = settings.getTandoorCredentials.first()
-            if(onBeforeCredentialsCheck(credentials)) return@launch
+            if (onBeforeCredentialsCheck(credentials)) return@launch
 
-            if(credentials == null) {
+            if (credentials == null) {
                 navHostController!!.navigate("onboarding") {
                     popUpTo("main") {
                         inclusive = true
@@ -104,15 +114,15 @@ class KitshnViewModel(
                 return@launch
             }
 
-            if(tandoorClient == null) tandoorClient = TandoorClient(credentials)
+            if (tandoorClient == null) tandoorClient = TandoorClient(credentials)
             favorites.init(tandoorClient!!)
 
             connectivityCheck()
 
             try {
                 tandoorClient!!.serverSettings.current()
-            } catch(e: TandoorRequestsError) {
-                if(e.response?.status == HttpStatusCode.NotFound) {
+            } catch (e: TandoorRequestsError) {
+                if (e.response?.status == HttpStatusCode.NotFound) {
                     navHostController?.navigate("alert/outdatedV1Instance") {
                         popUpTo("main") {
                             inclusive = true
@@ -123,11 +133,11 @@ class KitshnViewModel(
                 }
 
                 Logger.e("KitshnViewModel.kt", e)
-            } catch(e: Exception) {
+            } catch (e: Exception) {
                 Logger.e("KitshnViewModel.kt", e)
             }
 
-            if(settings.getOnboardingCompleted.first()) {
+            if (settings.getOnboardingCompleted.first()) {
                 onLaunched()
                 return@launch
             }
@@ -141,12 +151,12 @@ class KitshnViewModel(
     }
 
     fun navigateTo(mainRoute: String, subRoute: String? = null) {
-        if(!navHostController?.currentDestination?.route.equals(mainRoute))
+        if (!navHostController?.currentDestination?.route.equals(mainRoute))
             navHostController?.navigate(mainRoute)
 
-        if(subRoute == null) return
+        if (subRoute == null) return
 
-        if(!mainSubNavHostController?.currentDestination?.route.equals(subRoute))
+        if (!mainSubNavHostController?.currentDestination?.route.equals(subRoute))
             mainSubNavHostController?.navigate(subRoute)
     }
 
@@ -167,8 +177,8 @@ class KitshnViewModel(
 
     // enable offline state when having connectivity issues
     fun connectivityCheck() {
-        if(tandoorClient == null) return
-        if(!uiState.isInForeground) return
+        if (tandoorClient == null) return
+        if (!uiState.isInForeground) return
 
         viewModelScope.launch {
             var isOffline = true
@@ -184,13 +194,13 @@ class KitshnViewModel(
                     }
                 )
 
-                if(response.status == HttpStatusCode.OK)
+                if (response.status == HttpStatusCode.OK)
                     isOffline = false
-            } catch(_: TandoorRequestsError) {
-            } catch(_: SerializationException) {
+            } catch (_: TandoorRequestsError) {
+            } catch (_: SerializationException) {
             }
 
-            if(isOffline) {
+            if (isOffline) {
                 isOffline = true
 
                 try {
@@ -204,19 +214,19 @@ class KitshnViewModel(
                         }
                     )
 
-                    if(response.status == HttpStatusCode.OK)
+                    if (response.status == HttpStatusCode.OK)
                         isOffline = false
-                } catch(_: TandoorRequestsError) {
-                } catch(_: SerializationException) {
+                } catch (_: TandoorRequestsError) {
+                } catch (_: SerializationException) {
                 }
 
-                if(isOffline) {
+                if (isOffline) {
                     uiState.offlineState.isOffline = true
 
                     // automatically switch to shopping page if offline
-                    if((Clock.System.now().toEpochMilliseconds() - initTime) < 8000) {
-                        if(navHostController?.currentDestination?.route != "main") return@launch
-                        if(mainSubNavHostController?.currentDestination?.route != "home") return@launch
+                    if ((Clock.System.now().toEpochMilliseconds() - initTime) < 8000) {
+                        if (navHostController?.currentDestination?.route != "main") return@launch
+                        if (mainSubNavHostController?.currentDestination?.route != "home") return@launch
                         mainSubNavHostController?.navigate("shopping")
                     }
                 } else {
@@ -241,6 +251,11 @@ class KitshnViewModel(
     fun signOut() {
         settings.setOnboardingCompleted(false)
         settings.saveTandoorCredentials(null)
+        viewModelScope.launch(Dispatchers.IO) {
+            db.close()
+            FileSystem.SYSTEM.delete(dbFilePath.toPath())
+            FileSystem.SYSTEM.delete("$dbFilePath-shm".toPath())
+            FileSystem.SYSTEM.delete("$dbFilePath-wal".toPath())
+        }
     }
-
 }
