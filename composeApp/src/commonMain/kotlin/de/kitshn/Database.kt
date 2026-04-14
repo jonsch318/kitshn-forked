@@ -4,20 +4,21 @@ import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
+import androidx.room.TypeConverters
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import coil3.PlatformContext
 import de.kitshn.db.Converters
-import de.kitshn.db.RecipeDao
-import de.kitshn.db.RecipeEntity
 import de.kitshn.db.ShoppingDao
 import de.kitshn.db.ShoppingItemEntity
 import de.kitshn.db.SyncTransactionEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 
-@Database(entities = [], version = 1)
+@Database(entities = [ShoppingItemEntity::class, SyncTransactionEntity::class], version = 1)
+@TypeConverters(Converters::class)
 @ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun shoppingDao(): ShoppingDao
 }
 
 @Suppress("KotlinNoActualForExpect")

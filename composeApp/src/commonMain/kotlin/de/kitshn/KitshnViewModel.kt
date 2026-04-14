@@ -15,6 +15,7 @@ import de.kitshn.api.tandoor.TandoorClient
 import de.kitshn.api.tandoor.TandoorCredentials
 import de.kitshn.api.tandoor.TandoorRequestsError
 import de.kitshn.api.tandoor.reqAny
+import de.kitshn.repo.ShoppingRepository
 import de.kitshn.ui.route.RouteParameters
 import de.kitshn.ui.route.main.clearRememberAlternateNavController
 import de.kitshn.ui.state.clearForeverRememberMutableStateList
@@ -52,6 +53,7 @@ class KitshnViewModel(
 
     private val dbFilePath = getDatabasePath(context)
     val db = getRoomDatabase(getDatabaseBuilder(context))
+    val shoppingRepo = ShoppingRepository(db, viewModelScope)
 
     var isTest: Boolean = false
 

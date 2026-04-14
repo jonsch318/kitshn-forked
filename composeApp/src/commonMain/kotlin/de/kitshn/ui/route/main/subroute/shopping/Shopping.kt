@@ -50,9 +50,8 @@ import de.kitshn.TestTagRepository
 import de.kitshn.api.tandoor.TandoorRequestStateState
 import de.kitshn.api.tandoor.rememberTandoorRequestState
 import de.kitshn.cache.ShoppingListCache
-import de.kitshn.cache.ShoppingListEntriesCache
-import de.kitshn.cache.ShoppingListEntryOfflineActions
 import de.kitshn.cache.ShoppingSupermarketCache
+import de.kitshn.db.ShoppingListEntryOfflineActions
 import de.kitshn.handleTandoorRequestState
 import de.kitshn.model.route.GroupDividerShoppingListItemModel
 import de.kitshn.model.route.GroupHeaderShoppingListItemModel
@@ -103,11 +102,6 @@ import org.jetbrains.compose.resources.stringResource
 fun RouteMainSubrouteShopping(
     p: RouteParameters,
     platformContext: PlatformContext = LocalPlatformContext.current,
-    cache: ShoppingListEntriesCache = remember {
-        ShoppingListEntriesCache(
-            platformContext, p.vm.tandoorClient!!
-        )
-    },
     supermarketCache: ShoppingSupermarketCache = remember {
         ShoppingSupermarketCache(
             platformContext, p.vm.tandoorClient!!
@@ -123,7 +117,6 @@ fun RouteMainSubrouteShopping(
     vm: ShoppingViewModel = viewModel {
         ShoppingViewModel(
             p = p,
-            cache = cache,
             additionalShoppingSettingsChipRowState = additionalShoppingSettingsChipRowState
         )
     }
