@@ -10,10 +10,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import co.touchlab.kermit.Logger
+import coil3.PlatformContext
 import de.kitshn.api.tandoor.TandoorClient
 import de.kitshn.api.tandoor.TandoorCredentials
 import de.kitshn.api.tandoor.TandoorRequestsError
 import de.kitshn.api.tandoor.reqAny
+import de.kitshn.repo.ShoppingRepo
 import de.kitshn.ui.route.RouteParameters
 import de.kitshn.ui.route.main.clearRememberAlternateNavController
 import de.kitshn.ui.state.clearForeverRememberMutableStateList
@@ -22,14 +24,20 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
+import okio.FileSystem
+import okio.Path.Companion.toPath
+import okio.SYSTEM
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class KitshnViewModel(
+    context: PlatformContext,
     defaultTandoorClient: TandoorClient? = null,
 
     /**
@@ -42,6 +50,11 @@ class KitshnViewModel(
      */
     val onLaunched: () -> Unit = { }
 ) : ViewModel() {
+
+    // necessary for logout / db clearing
+    private val dbFilePath = getDatabasePath(context)
+    val db = getRoomDatabase(getDatabaseBuilder(context))
+    val shoppingRepo = ShoppingRepo(db, viewModelScope)
 
     var isTest: Boolean = false
 
@@ -241,6 +254,12 @@ class KitshnViewModel(
     fun signOut() {
         settings.setOnboardingCompleted(false)
         settings.saveTandoorCredentials(null)
+        viewModelScope.launch(Dispatchers.IO){
+            db.close()
+            FileSystem.SYSTEM.delete(dbFilePath.toPath())
+            FileSystem.SYSTEM.delete("$dbFilePath-shm".toPath())
+            FileSystem.SYSTEM.delete("$dbFilePath-wal".toPath())
+        }
     }
 
 }

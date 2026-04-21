@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.LocalDensity
 import coil3.compose.LocalPlatformContext
 import de.kitshn.api.tandoor.TandoorClient
 import de.kitshn.api.tandoor.TandoorCredentials
-import de.kitshn.cache.ShoppingListEntriesCache
 import de.kitshn.ui.route.navigation.PrimaryNavigation
 import de.kitshn.ui.theme.KitshnTheme
 import de.kitshn.ui.theme.custom.AvailableColorSchemes
@@ -52,8 +51,11 @@ fun App(
      */
     onLaunched: () -> Unit = { }
 ) {
+    val context = LocalPlatformContext.current
+
     val vm = remember {
         KitshnViewModel(
+            context = context,
             defaultTandoorClient = SavedTandoorClient.value,
             onBeforeCredentialsCheck = onBeforeCredentialsCheck,
             onLaunched = onLaunched
@@ -125,15 +127,9 @@ fun App(
         }
     }
 
-    // purge shopping list cache
-    if(vm.tandoorClient == null) return
-
-    val platformContext = LocalPlatformContext.current
-    val shoppingListEntriesCache = remember {
-        ShoppingListEntriesCache(platformContext, vm.tandoorClient!!)
-    }
-
-    LaunchedEffect(Unit) {
-        shoppingListEntriesCache.purgeCache()
+    LaunchedEffect(vm.tandoorClient) {
+        vm.tandoorClient?.let {
+            vm.shoppingRepo.refresh(it)
+        }
     }
 }
