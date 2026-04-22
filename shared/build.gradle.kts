@@ -131,6 +131,11 @@ kotlin {
 
             implementation(libs.androidx.room.runtime)
             implementation(libs.androidx.sqlite.bundled)
+
+            api(project.dependencies.platform(libs.koin.bom))
+            api(libs.koin.core)
+            api(libs.koin.compose)
+            api(libs.koin.compose.viewmodel)
         }
 
         androidMain {
@@ -155,6 +160,9 @@ kotlin {
                 implementation(libs.androidx.media3.ui)
 
                 implementation(libs.material)
+
+                api(project.dependencies.platform(libs.koin.bom))
+                api(libs.koin.android)
             }
         }
 

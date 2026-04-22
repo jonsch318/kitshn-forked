@@ -6,7 +6,6 @@ import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
 import androidx.room.TypeConverters
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
-import coil3.PlatformContext
 import de.kitshn.db.Converters
 import de.kitshn.db.dao.ShoppingDao
 import de.kitshn.db.entity.ShoppingItemEntity
@@ -32,10 +31,6 @@ abstract class AppDatabase: RoomDatabase() {
 expect object AppDatabaseConstructor: RoomDatabaseConstructor<AppDatabase> {
     override fun initialize(): AppDatabase
 }
-
-expect fun getDatabaseBuilder(context: PlatformContext): RoomDatabase.Builder<AppDatabase>
-
-expect fun getDatabasePath(context: PlatformContext): String
 
 fun getRoomDatabase(builder: RoomDatabase.Builder<AppDatabase>): AppDatabase {
     return builder

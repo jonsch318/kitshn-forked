@@ -96,10 +96,10 @@ class ShoppingViewModel(
 
         if (entries.isEmpty()){
             shoppingListEntriesFetchRequest.wrapRequest {
-                repo.refresh(client)
+                repo.refresh()
             }
         } else {
-            repo.refresh(client)
+            repo.refresh()
         }
     }
 
@@ -348,11 +348,11 @@ class ShoppingViewModel(
             entries.forEach {
                 when (action) {
                     ShoppingListEntryOfflineActions.CHECK
-                        -> repo.toggleCheck(client, it.id, true)
+                        -> repo.toggleCheck(it.id, true)
                     ShoppingListEntryOfflineActions.UNCHECK
-                        -> repo.toggleCheck(client, it.id, false)
+                        -> repo.toggleCheck(it.id, false)
                     ShoppingListEntryOfflineActions.DELETE
-                        -> repo.delete(client, it.id)
+                        -> repo.delete(it.id)
                 }
             }
         }

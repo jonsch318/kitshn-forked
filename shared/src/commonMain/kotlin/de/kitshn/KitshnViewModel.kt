@@ -3,19 +3,16 @@
 package de.kitshn
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import co.touchlab.kermit.Logger
-import coil3.PlatformContext
 import de.kitshn.api.tandoor.TandoorClient
 import de.kitshn.api.tandoor.TandoorCredentials
 import de.kitshn.api.tandoor.TandoorRequestsError
 import de.kitshn.api.tandoor.reqAny
 import de.kitshn.repo.ShoppingRepo
+import de.kitshn.session.TandoorSession
 import de.kitshn.ui.route.RouteParameters
 import de.kitshn.ui.route.main.clearRememberAlternateNavController
 import de.kitshn.ui.state.clearForeverRememberMutableStateList
@@ -24,6 +21,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
@@ -36,35 +34,40 @@ import okio.SYSTEM
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-class KitshnViewModel(
-    context: PlatformContext,
-    defaultTandoorClient: TandoorClient? = null,
-
-    /**
-     * calls before potential onboarding. Aborts onboarding if true is returned
-     */
+/**
+ * Runtime-only parameters for [KitshnViewModel] (callbacks supplied by the UI
+ * layer). Passed via `parametersOf(...)` when resolving the VM.
+ */
+data class KitshnViewModelArgs(
+    /** Called before potential onboarding. Aborts onboarding if `true` is returned. */
     val onBeforeCredentialsCheck: (credentials: TandoorCredentials?) -> Boolean = { false },
 
-    /**
-     * after onboarding checks and completed onboarding
-     */
+    /** Called after onboarding checks and completed onboarding. */
+    val onLaunched: () -> Unit = { }
+)
+
+class KitshnViewModel(
+    val db: AppDatabase,
+    private val dbFilePath: String,
+    val settings: SettingsViewModel,
+    private val session: TandoorSession,
+    val shoppingRepo: ShoppingRepo,
+    private val applicationScope: CoroutineScope,
+
+    val onBeforeCredentialsCheck: (credentials: TandoorCredentials?) -> Boolean = { false },
     val onLaunched: () -> Unit = { }
 ) : ViewModel() {
-
-    // necessary for logout / db clearing
-    private val dbFilePath = getDatabasePath(context)
-    val db = getRoomDatabase(getDatabaseBuilder(context))
-    val shoppingRepo = ShoppingRepo(db, viewModelScope)
 
     var isTest: Boolean = false
 
     var navHostController: NavHostController? = null
     var mainSubNavHostController: NavHostController? = null
 
-    var tandoorClient: TandoorClient? by mutableStateOf(defaultTandoorClient)
+    var tandoorClient: TandoorClient?
+        get() = session.client
+        set(value) { session.client = value }
 
     val favorites = FavoritesViewModel()
-    val settings = SettingsViewModel()
 
     val uiState = UiStateModel()
 
@@ -105,7 +108,7 @@ class KitshnViewModel(
             if(settings.getFirstRunTime.first() == -1L)
                 settings.setFirstRunTime()
 
-            val credentials = settings.getTandoorCredentials.first()
+            val credentials = session.loadPersistedCredentials()
             if(onBeforeCredentialsCheck(credentials)) return@launch
 
             if(credentials == null) {
@@ -117,13 +120,13 @@ class KitshnViewModel(
                 return@launch
             }
 
-            if(tandoorClient == null) tandoorClient = TandoorClient(credentials)
-            favorites.init(tandoorClient!!)
+            session.hydrate(credentials)
+            favorites.init(session.client!!)
 
             connectivityCheck()
 
             try {
-                tandoorClient!!.serverSettings.current()
+                session.client!!.serverSettings.current()
             } catch(e: TandoorRequestsError) {
                 if(e.response?.status == HttpStatusCode.NotFound) {
                     navHostController?.navigate("alert/outdatedV1Instance") {
@@ -180,14 +183,14 @@ class KitshnViewModel(
 
     // enable offline state when having connectivity issues
     fun connectivityCheck() {
-        if(tandoorClient == null) return
+        val client = session.client ?: return
         if(!uiState.isInForeground) return
 
         viewModelScope.launch {
             var isOffline = true
 
             try {
-                val response = tandoorClient!!.reqAny(
+                val response = client.reqAny(
                     endpoint = "/",
                     _method = HttpMethod.Get,
                     customHttpClient = HttpClient {
@@ -207,7 +210,7 @@ class KitshnViewModel(
                 isOffline = true
 
                 try {
-                    val response = tandoorClient!!.reqAny(
+                    val response = client.reqAny(
                         endpoint = "/",
                         _method = HttpMethod.Get,
                         customHttpClient = HttpClient {
@@ -242,19 +245,20 @@ class KitshnViewModel(
     }
 
     fun signIn(client: TandoorClient, credentials: TandoorCredentials) {
-        tandoorClient = client
+        session.signIn(client, credentials)
 
-        settings.saveTandoorCredentials(credentials)
         navHostController?.navigate("onboarding/welcome")
 
-        favorites.init(tandoorClient!!)
+        favorites.init(client)
         connectivityCheck()
     }
 
     fun signOut() {
         settings.setOnboardingCompleted(false)
-        settings.saveTandoorCredentials(null)
-        viewModelScope.launch(Dispatchers.IO){
+        session.signOut()
+        // Runs on the application scope so the teardown completes even if the
+        // VM's own scope is cancelled by navigation away from the host screen.
+        applicationScope.launch(Dispatchers.IO) {
             db.close()
             FileSystem.SYSTEM.delete(dbFilePath.toPath())
             FileSystem.SYSTEM.delete("$dbFilePath-shm".toPath())

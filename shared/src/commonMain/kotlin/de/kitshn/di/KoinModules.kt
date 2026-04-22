@@ -1,0 +1,79 @@
+package de.kitshn.di
+
+import de.kitshn.KitshnViewModel
+import de.kitshn.KitshnViewModelArgs
+import de.kitshn.SettingsViewModel
+import de.kitshn.repo.ShoppingRepo
+import de.kitshn.session.TandoorSession
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.SupervisorJob
+import org.koin.core.KoinApplication
+import org.koin.core.module.Module
+import org.koin.core.module.dsl.viewModel
+import org.koin.core.qualifier.named
+import org.koin.dsl.KoinAppDeclaration
+import org.koin.dsl.module
+import org.koin.core.context.startKoin
+
+val APPLICATION_SCOPE_QUALIFIER = named("applicationScope")
+val DB_FILE_PATH_QUALIFIER = named("dbFilePath")
+
+/** Platform-specific bindings: [de.kitshn.AppDatabase] and its on-disk path. */
+expect val platformModule: Module
+
+private val coroutineModule = module {
+    single<CoroutineScope>(APPLICATION_SCOPE_QUALIFIER) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+}
+
+private val sessionModule = module {
+    single { SettingsViewModel() }
+    single { TandoorSession(settings = get()) }
+}
+
+private val repositoryModule = module {
+    single {
+        ShoppingRepo(
+            db = get(),
+            session = get(),
+            scope = get(APPLICATION_SCOPE_QUALIFIER),
+        )
+    }
+}
+
+private val viewModelModule = module {
+    viewModel { (args: KitshnViewModelArgs) ->
+        KitshnViewModel(
+            db = get(),
+            dbFilePath = get(DB_FILE_PATH_QUALIFIER),
+            settings = get(),
+            session = get(),
+            shoppingRepo = get(),
+            applicationScope = get(APPLICATION_SCOPE_QUALIFIER),
+            onBeforeCredentialsCheck = args.onBeforeCredentialsCheck,
+            onLaunched = args.onLaunched,
+        )
+    }
+}
+
+fun sharedKoinModules(): List<Module> = listOf(
+    platformModule,
+    coroutineModule,
+    sessionModule,
+    repositoryModule,
+    viewModelModule,
+)
+
+/**
+ * Starts Koin with all shared modules. Must be called exactly once per process,
+ * before the first composable that resolves an injected dependency.
+ *
+ * @param config hook for platform-specific configuration (e.g. `androidContext`).
+ */
+fun initKoin(config: KoinAppDeclaration? = null): KoinApplication = startKoin {
+    config?.invoke(this)
+    modules(sharedKoinModules())
+}

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,15 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
-import coil3.compose.LocalPlatformContext
-import de.kitshn.api.tandoor.TandoorClient
 import de.kitshn.api.tandoor.TandoorCredentials
 import de.kitshn.ui.route.navigation.PrimaryNavigation
 import de.kitshn.ui.theme.KitshnTheme
 import de.kitshn.ui.theme.custom.AvailableColorSchemes
 import kotlinx.coroutines.delay
-
-private val SavedTandoorClient = mutableStateOf<TandoorClient?>(null)
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 @Composable
 fun App(
@@ -51,24 +48,17 @@ fun App(
      */
     onLaunched: () -> Unit = { }
 ) {
-    val context = LocalPlatformContext.current
-
-    val vm = remember {
-        KitshnViewModel(
-            context = context,
-            defaultTandoorClient = SavedTandoorClient.value,
-            onBeforeCredentialsCheck = onBeforeCredentialsCheck,
-            onLaunched = onLaunched
-        ).also { onVmCreated(it) }
+    val vm: KitshnViewModel = koinViewModel {
+        parametersOf(
+            KitshnViewModelArgs(
+                onBeforeCredentialsCheck = onBeforeCredentialsCheck,
+                onLaunched = onLaunched
+            )
+        )
     }
+    remember(vm) { vm.also { onVmCreated(it) } }
 
     val density = LocalDensity.current
-
-    DisposableEffect(key1 = Unit) {
-        onDispose {
-            SavedTandoorClient.value = vm.tandoorClient
-        }
-    }
 
     val colorSchemeName = vm.settings.getColorScheme.collectAsState(initial = null)
     var colorScheme by remember { mutableStateOf(AvailableColorSchemes.getDefault()) }
@@ -128,8 +118,8 @@ fun App(
     }
 
     LaunchedEffect(vm.tandoorClient) {
-        vm.tandoorClient?.let {
-            vm.shoppingRepo.refresh(it)
+        if (vm.tandoorClient != null) {
+            vm.shoppingRepo.refresh()
         }
     }
 }

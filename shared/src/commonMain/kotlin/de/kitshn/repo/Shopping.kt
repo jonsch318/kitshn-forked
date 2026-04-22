@@ -2,12 +2,12 @@ package de.kitshn.repo
 
 import co.touchlab.kermit.Logger
 import de.kitshn.AppDatabase
-import de.kitshn.api.tandoor.TandoorClient
 import de.kitshn.api.tandoor.model.shopping.TandoorShoppingListEntry
 import de.kitshn.db.entity.ShoppingListEntryOfflineActions
 import de.kitshn.db.entity.ShoppingTransactionEntity
 import de.kitshn.db.entity.toAPI
 import de.kitshn.db.entity.toEntity
+import de.kitshn.session.TandoorSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -21,21 +21,23 @@ import kotlin.collections.map
 
 class ShoppingRepo(
     db: AppDatabase,
+    private val session: TandoorSession,
     private val scope: CoroutineScope
 ) {
     private val dao = db.shoppingDao()
     private val refreshMutex = Mutex()
 
     fun observe(): Flow<List<TandoorShoppingListEntry>> =
-        dao.getAllAsFlow().map { entities -> entities.map { it.toAPI() }}
+        dao.getAllAsFlow().map { entities -> entities.map { it.toAPI() } }
 
-    suspend fun refresh(client: TandoorClient) {
+    suspend fun refresh() {
+        val client = session.client ?: return
         if (refreshMutex.isLocked) return
 
         refreshMutex.withLock {
             try {
                 // sync pending first
-                syncPending(client)
+                syncPending()
 
                 val remoteItems = client.shopping.fetchAll()
                 withContext(Dispatchers.IO) {
@@ -47,23 +49,24 @@ class ShoppingRepo(
         }
     }
 
-    suspend fun toggleCheck(client: TandoorClient?, entryId: Int, checked: Boolean) {
+    suspend fun toggleCheck(entryId: Int, checked: Boolean) {
         withContext(Dispatchers.IO) {
             // update local DB
             dao.updateChecked(entryId, checked)
 
             // log transaction
-            val action = if (checked) ShoppingListEntryOfflineActions.CHECK else ShoppingListEntryOfflineActions.UNCHECK
+            val action =
+                if (checked) ShoppingListEntryOfflineActions.CHECK else ShoppingListEntryOfflineActions.UNCHECK
             dao.insertTransaction(ShoppingTransactionEntity(entryId = entryId, action = action))
         }
 
         // attempt sync if online
-        if (client != null) {
-            scope.launch { syncPending(client) }
+        if (session.isSignedIn) {
+            scope.launch { syncPending() }
         }
     }
 
-    suspend fun delete(client: TandoorClient?, entryId: Int) {
+    suspend fun delete(entryId: Int) {
         withContext(Dispatchers.IO) {
             // update local DB
             dao.delete(entryId)
@@ -78,15 +81,17 @@ class ShoppingRepo(
         }
 
         // attempt sync if online
-        if (client != null) {
-            scope.launch { syncPending(client) }
+        if (session.isSignedIn) {
+            scope.launch { syncPending() }
         }
     }
 
     /**
      * syncPending publishes the transaction log to the server
      */
-    suspend fun syncPending(client: TandoorClient) {
+    suspend fun syncPending() {
+        val client = session.client ?: return
+
         val transactions = withContext(Dispatchers.IO) {
             dao.getPendingTransactions()
         }
@@ -114,7 +119,10 @@ class ShoppingRepo(
                     idsToRemove.forEach { dao.deleteTransaction(it) }
                 }
             } catch (e: Exception) {
-                Logger.e(e, tag = "ShoppingRepository") { "Failed to sync consolidated action $action for entry $entryId" }
+                Logger.e(
+                    e,
+                    tag = "ShoppingRepository"
+                ) { "Failed to sync consolidated action $action for entry $entryId" }
             }
         }
     }

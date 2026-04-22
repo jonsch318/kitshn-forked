@@ -1,19 +1,16 @@
 package de.kitshn
 
+import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import coil3.PlatformContext
 
-actual fun getDatabasePath(context: PlatformContext): String {
-    val appContext = context.applicationContext
-    val dbFile = appContext.getDatabasePath(ROOM_DB_FILE)
-    return dbFile.absolutePath
+fun getDatabasePath(context: Context): String {
+    return context.getDatabasePath(ROOM_DB_FILE).absolutePath
 }
 
-actual fun getDatabaseBuilder(context: PlatformContext): RoomDatabase.Builder<AppDatabase> {
-    val dbFilePath = getDatabasePath(context)
+fun getDatabaseBuilder(context: Context): RoomDatabase.Builder<AppDatabase> {
     return Room.databaseBuilder<AppDatabase>(
         context = context.applicationContext,
-        name = dbFilePath
+        name = getDatabasePath(context)
     )
 }
