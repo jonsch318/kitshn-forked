@@ -12,9 +12,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SupermarketCategoryDao {
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertAllIfAbsent(categories: List<SupermarketCategoryEntity>)
-
     @Insert
     suspend fun insert(entity: SupermarketCategoryEntity): Long
 

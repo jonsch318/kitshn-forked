@@ -6,7 +6,6 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
-import androidx.room.Upsert
 import de.kitshn.db.entity.FoodEntity
 import de.kitshn.db.entity.FoodPendingDeleteEntity
 import de.kitshn.db.entity.FoodWithRelations
@@ -14,8 +13,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FoodDao {
-    @Upsert
-    suspend fun upsert(entity: FoodEntity): Long
     @Insert
     suspend fun insert(entity: FoodEntity): Long
 
@@ -29,39 +26,42 @@ interface FoodDao {
         return insert(entity).toInt()
     }
 
-    // Updates preserving existing values that are `null`
+    @Query("UPDATE ShoppingItemEntity SET food_id = :winnerLocalId WHERE food_id = :loserLocalId")
+    suspend fun repointShoppingItems(loserLocalId: Int, winnerLocalId: Int)
+
+    /**
+     * Updates preserving existing values that are `null`. Returns the surviving localId,
+     * which may differ from any localId passed in.
+     */
     @Transaction
-    suspend fun upsertByRemoteId(entity: FoodEntity): Int {
+    suspend fun upsertByRemoteId(entity: FoodEntity): Int = writeServerFood(entity, null)
+
+    /**
+     * Writes the server response for the pending create [stubLocalId]. Returns the surviving
+     * localId — when the server folded the stub into a food we already hold, that is the
+     * existing row and the stub is gone.
+     */
+    @Transaction
+    suspend fun resolvePendingCreate(stubLocalId: Int, entity: FoodEntity): Int =
+        writeServerFood(entity, stubLocalId)
+
+    private suspend fun writeServerFood(entity: FoodEntity, stubLocalId: Int?): Int {
         val remoteId = requireNotNull(entity.remoteId) {
-            "upsertByRemoteId requires a non-null remoteId"
+            "writeServerFood requires a non-null remoteId"
         }
-        val existing = findByRemoteId(remoteId) ?: findStubByName(entity.name.lowercase())
-        return if (existing != null) {
-            update(
-                entity.copy(
-                    localId = existing.localId,
-                    plural_name = entity.plural_name ?: existing.plural_name,
-                    description = entity.description ?: existing.description,
-                    url = entity.url ?: existing.url,
-                    recipe_id = entity.recipe_id ?: existing.recipe_id,
-                    recipe_name = entity.recipe_name ?: existing.recipe_name,
-                    recipe_url = entity.recipe_url ?: existing.recipe_url,
-                    properties_food_amount = entity.properties_food_amount
-                        ?: existing.properties_food_amount,
-                    properties_food_unit_id = entity.properties_food_unit_id
-                        ?: existing.properties_food_unit_id,
-                    fdc_id = entity.fdc_id ?: existing.fdc_id,
-                    full_name = entity.full_name ?: existing.full_name,
-                    supermarket_category_id = entity.supermarket_category_id
-                        ?: existing.supermarket_category_id,
-                    ignore_shopping = entity.ignore_shopping || existing.ignore_shopping,
-                    open_data_slug = entity.open_data_slug ?: existing.open_data_slug,
-                )
-            )
-            existing.localId
-        } else {
-            insert(entity).toInt()
-        }
+        val stub = stubLocalId?.let { findByLocalId(it) }
+        val existing = findByRemoteId(remoteId)
+            ?: stub
+            ?: findStubByName(entity.name.lowercase())
+            ?: return insert(entity).toInt()
+        if (stub != null && stub.localId != existing.localId) absorb(stub.localId, existing.localId)
+        update(entity.withFallbacksFrom(existing))
+        return existing.localId
+    }
+
+    private suspend fun absorb(loserLocalId: Int, winnerLocalId: Int) {
+        repointShoppingItems(loserLocalId, winnerLocalId)
+        deleteByLocalId(loserLocalId)
     }
 
     @Query("SELECT * FROM food WHERE id = :localId LIMIT 1")
@@ -136,3 +136,20 @@ interface FoodDao {
     """)
     fun searchWithRelations(query: String): Flow<List<FoodWithRelations>>
 }
+
+private fun FoodEntity.withFallbacksFrom(existing: FoodEntity) = copy(
+    localId = existing.localId,
+    plural_name = plural_name ?: existing.plural_name,
+    description = description ?: existing.description,
+    url = url ?: existing.url,
+    recipe_id = recipe_id ?: existing.recipe_id,
+    recipe_name = recipe_name ?: existing.recipe_name,
+    recipe_url = recipe_url ?: existing.recipe_url,
+    properties_food_amount = properties_food_amount ?: existing.properties_food_amount,
+    properties_food_unit_id = properties_food_unit_id ?: existing.properties_food_unit_id,
+    fdc_id = fdc_id ?: existing.fdc_id,
+    full_name = full_name ?: existing.full_name,
+    supermarket_category_id = supermarket_category_id ?: existing.supermarket_category_id,
+    ignore_shopping = ignore_shopping || existing.ignore_shopping,
+    open_data_slug = open_data_slug ?: existing.open_data_slug,
+)

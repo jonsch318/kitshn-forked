@@ -111,7 +111,8 @@ class FoodRepo(
             .map { it.second }
     }
 
-    suspend fun findOrCreate(name: String): TandoorFood {
+    suspend fun findOrCreate(rawName: String): TandoorFood {
+        val name = rawName.trim()
         val q = name.lowercase()
         return mutex.withLock {
             dao.findByName(q)?.let { existing ->
@@ -137,7 +138,11 @@ class FoodRepo(
                     },
                 )
             }
-            val localId = dao.findOrInsert(entity)
+            val localId = if (entity.remoteId == null) {
+                dao.findOrInsert(entity)
+            } else {
+                dao.upsertByRemoteId(entity)
+            }
             retrieve(localId) ?: entity.copy(localId = localId).toMinimalModel()
         }
     }
@@ -253,10 +258,9 @@ class FoodRepo(
             mutex.withLock {
                 supermarketCategoryRepo.upsertAll(listOfNotNull(server.supermarket_category))
                 unitRepo.upsertAll(listOfNotNull(server.properties_food_unit))
-                val current = dao.findByLocalId(stub.localId) ?: return@withLock
-                dao.update(
+                dao.resolvePendingCreate(
+                    stub.localId,
                     server.toEntity(
-                        localId = current.localId,
                         unitLocalId = server.properties_food_unit?.id?.let {
                             unitRepo.localIdByRemoteId(
                                 it

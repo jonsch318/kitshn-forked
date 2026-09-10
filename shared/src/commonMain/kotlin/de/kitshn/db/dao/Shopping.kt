@@ -5,7 +5,6 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
-import androidx.room.Upsert
 import de.kitshn.db.entity.ShoppingItemEntity
 import de.kitshn.db.entity.ShoppingItemWithRelations
 import de.kitshn.db.entity.ShoppingTransactionEntity
@@ -26,9 +25,6 @@ interface ShoppingDao {
 
     @Update
     suspend fun update(item: ShoppingItemEntity)
-
-    @Upsert
-    suspend fun upsertAll(items: List<ShoppingItemEntity>)
 
     @Query("SELECT * FROM ShoppingItemEntity WHERE id = :localId LIMIT 1")
     suspend fun findByLocalId(localId: Int): ShoppingItemEntity?

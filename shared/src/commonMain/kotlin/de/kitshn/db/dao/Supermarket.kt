@@ -14,9 +14,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SupermarketDao {
-    @Upsert
-    suspend fun upsertSupermarkets(entities: List<SupermarketEntity>)
-
     @Insert()
     suspend fun insertSupermarket(entity: SupermarketEntity): Long
 
