@@ -57,10 +57,11 @@ class SupermarketCategoryRepo(
     }
 
     suspend fun create(name: String): TandoorSupermarketCategory {
-        val localId = dao.findOrInsert(SupermarketCategoryEntity(name = name))
+        val trimmed = name.trim()
+        val localId = dao.findOrInsert(SupermarketCategoryEntity(name = trimmed))
         use(localId, scope)
         return dao.findByLocalId(localId)?.toModel()
-            ?: SupermarketCategoryEntity(localId = localId, name = name).toModel()
+            ?: SupermarketCategoryEntity(localId = localId, name = trimmed).toModel()
     }
 
     suspend fun delete(localId: Int) {
@@ -135,7 +136,7 @@ class SupermarketCategoryRepo(
                 val name = dao.findByLocalId(localId)?.name ?: return
                 val resp = client.supermarket.createCategory(name)
                 val newRemoteId = resp.id ?: return
-                dao.upsertAll(listOf(resp.toEntity(localId = localId)))
+                dao.resolvePendingCreate(localId, resp.toEntity())
                 markItemSynced(newRemoteId)
             } else {
                 val resp = client.supermarket.retrieveCategory(remoteId)

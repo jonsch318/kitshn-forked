@@ -6,6 +6,7 @@ import co.touchlab.kermit.Logger
 import de.kitshn.api.tandoor.TandoorRequestsError
 import de.kitshn.db.dao.RepoMetaDao
 import de.kitshn.db.entity.RepoMetaEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -109,6 +110,10 @@ abstract class SyncableRepo(
                 performSyncAction()
                 syncPendingAfter()
             } while (shouldRunAgain())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            Logger.e(e, tag = repoTag) { "$repoMetaName sync failed" }
         } finally {
             _isSyncing.value = false
             mutex.unlock()
@@ -160,6 +165,10 @@ abstract class SyncableRepo(
                 if (withinItemSyncInterval(localId)) return@launch
                 syncItem(localId)
                 markItemSynced(localId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                Logger.e(e, tag = repoTag) { "$repoMetaName item sync failed localId=$localId" }
             } finally {
                 mutex.unlock()
             }

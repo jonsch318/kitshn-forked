@@ -67,10 +67,11 @@ class UnitRepo(
     }
 
     suspend fun findOrCreate(name: String): TandoorUnit {
-        val localId = dao.findOrInsert(UnitEntity(name = name))
+        val trimmed = name.trim()
+        val localId = dao.findOrInsert(UnitEntity(name = trimmed))
         use(localId, scope)
         return dao.findByLocalId(localId)?.toModel()
-            ?: UnitEntity(localId = localId, name = name).toModel()
+            ?: UnitEntity(localId = localId, name = trimmed).toModel()
     }
 
     suspend fun delete(localId: Int): DeleteResult {
@@ -142,7 +143,7 @@ class UnitRepo(
             if (remoteId == null) {
                 val name = dao.findByLocalId(localId)?.name ?: return
                 val resp = client.unit.create(name)
-                dao.upsertAll(listOf(resp.toEntity(localId = localId)))
+                dao.resolvePendingCreate(localId, resp.toEntity())
                 markItemSynced(resp.id)
             } else {
                 val resp = client.unit.retrieve(remoteId)
@@ -185,7 +186,7 @@ class UnitRepo(
                 Logger.w(e, tag = repoTag) { "Failed pending create for localId=${stub.localId}" }
                 continue
             }
-            dao.upsertAll(listOf(server.toEntity(localId = stub.localId)))
+            dao.resolvePendingCreate(stub.localId, server.toEntity())
             markItemSynced(server.id)
         }
     }
